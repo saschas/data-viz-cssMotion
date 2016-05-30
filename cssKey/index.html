@@ -1,0 +1,173 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 13px Helvetica, Arial; }
+      form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+      form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+      form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+      #messages { list-style-type: none; margin: 0; padding: 0; }
+      #messages li { padding: 5px 10px; }
+      #messages li:nth-child(odd) { background: #eee; }
+
+      button{
+        width:50px;
+        height:50px;
+        background: red;
+        border-radius: 50%;
+        position: absolute;
+        top:0;
+        bottom:0;
+        left:0;
+        right:0;
+        margin:auto;
+      }
+
+      .record-active{
+        background:green;
+      }
+      #data{
+        width:100%;
+        background:#eee;
+      }
+    </style>
+
+  </head>
+  <body>
+    
+    <button id="record">Record</button>
+    <div id="data"></div>
+   <script src="/socket.io/socket.io.js"></script>
+<script>
+//__________________________ Variables
+
+
+var button = document.getElementById('record');
+var dataHolder = document.getElementById('data');
+var t = 0;
+
+var dataAcc = [];
+var dataMotion = [];
+var recordArray = [];
+
+var record = false;
+
+//__________________________ EXTRA FUNCTIONS
+(function(console){
+
+console.save = function(data, filename){
+
+    if(!data) {
+        console.error('Console.save: No data')
+        return;
+    }
+
+    if(!filename) filename = 'console.json'
+
+    if(typeof data === "object"){
+        data = JSON.stringify(data, undefined, 4)
+    }
+
+    var blob = new Blob([data], {type: 'text/json'}),
+        e    = document.createEvent('MouseEvents'),
+        a    = document.createElement('a')
+
+    a.download = filename
+    a.href = window.URL.createObjectURL(blob)
+    a.dataset.downloadurl =  ['text/json', a.download, a.href].join(':')
+    e.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null)
+    a.dispatchEvent(e)
+ }
+})(console)
+//__________________________ Record
+
+button.addEventListener('click',function() {
+  this.classList.toggle('record-active')
+  if(!record){
+
+    record = true;
+  }else{
+    console.save(recordArray);
+
+    socket.emit('save', recordArray);
+    record = false;
+  }
+
+});
+
+
+//__________________________ Socket
+
+  var socket = io();
+
+//__________________________ Motion Detection
+
+if (window.DeviceOrientationEvent) {
+  
+  window.addEventListener('deviceorientation', function(eventData) {
+        var LR = eventData.gamma;
+        var FB = eventData.beta;
+        var DIR = eventData.alpha;
+        deviceOrientationHandler(LR, FB, DIR);
+        }, false);
+
+  window.addEventListener('devicemotion', function () {
+
+      motionHandler(event.acceleration.x * 2, event.acceleration.y * 2)
+      
+    }, true);
+
+
+} else {
+        alert("Not supported on your device or browser.  Sorry.");
+}
+
+
+
+
+
+function deviceOrientationHandler(LR, FB, DIR) {
+   //for webkit browser
+   dataHolder.innerHTML = "rotate("+ LR +"deg) rotate3d(1,0,0, "+ (FB*-1)+"deg)"  + "rotate("+ LR +"deg) rotate3d(1,0,0, "+ (FB*-1)+"deg)";
+
+
+     dataAcc = {
+      time : new Date(),
+      rot : LR,
+      fb : FB*-1
+     }
+}
+
+
+function motionHandler(x,y) {
+   //for webkit browser
+   dataHolder.innerHTML = "x: "+ x + ", y: "+ y;
+     dataMotion = {
+        time : new Date(),
+        x : x,
+        y : y
+     };
+  
+  socket.emit('motion', "x" + x + "y" + y );
+}
+
+function render(time){
+  requestAnimationFrame(render);
+
+
+    if(record){     
+      recordArray.push({
+        acc : dataAcc,
+        motion : dataMotion
+      });
+    }
+}
+
+
+render(t);
+
+</script>
+  </body>
+</html>
